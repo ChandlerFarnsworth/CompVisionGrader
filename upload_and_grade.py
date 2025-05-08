@@ -50,6 +50,11 @@ def copy_file_to_uploads(source_path):
         print(f"✗ Error: File must be an Excel file (.xlsx, .xlsm, etc.): {source_path}")
         return None
     
+    # Check if the file is already in the uploads folder
+    if os.path.dirname(os.path.abspath(source_path)) == os.path.abspath(UPLOAD_FOLDER):
+        print(f"✓ File is already in uploads folder: {source_path}")
+        return source_path
+    
     # Generate a unique filename
     dest_filename = generate_unique_filename(os.path.basename(source_path))
     dest_path = os.path.join(UPLOAD_FOLDER, dest_filename)
@@ -72,28 +77,41 @@ def grade_uploaded_file(file_path):
     
     print(f"\n===== GRADING: {os.path.basename(file_path)} =====")
     print(f"Comparing against solution: {SOLUTION_FILE}")
+    print(f"Full file path: {os.path.abspath(file_path)}")
+    
+    # Verify the file exists
+    if not os.path.exists(file_path):
+        print(f"✗ Error: File does not exist at path: {file_path}")
+        return
+    
+    # Print file info
+    print(f"File size: {os.path.getsize(file_path)} bytes")
+    print(f"File exists check: {os.path.exists(file_path)}")
     
     # Grade the submission
-    result = grade_excel_worksheet(file_path, SOLUTION_FILE)
-    
-    # Display results
-    if 'score' in result:
-        percentage = result['score'] * 100
-        print(f"\nSCORE: {percentage:.2f}%")
+    try:
+        result = grade_excel_worksheet(file_path, SOLUTION_FILE)
         
-        # Create a feedback file
-        feedback_path = file_path.replace('.xlsx', '_feedback.txt')
-        with open(feedback_path, 'w') as f:
-            f.write(result['feedback'])
-        
-        print(f"Detailed feedback saved to: {feedback_path}")
-        
-        # Print the feedback to the console
-        print("\n" + "=" * 50)
-        print(result['feedback'])
-        print("=" * 50)
-    else:
-        print(f"Error grading file: {result.get('error', 'Unknown error')}")
+        # Display results
+        if 'score' in result:
+            percentage = result['score'] * 100
+            print(f"\nSCORE: {percentage:.2f}%")
+            
+            # Create a feedback file
+            feedback_path = file_path.replace('.xlsx', '_feedback.txt').replace('.xlsm', '_feedback.txt')
+            with open(feedback_path, 'w') as f:
+                f.write(result['feedback'])
+            
+            print(f"Detailed feedback saved to: {feedback_path}")
+            
+            # Print the feedback to the console
+            print("\n" + "=" * 50)
+            print(result['feedback'])
+            print("=" * 50)
+        else:
+            print(f"Error grading file: {result.get('error', 'Unknown error')}")
+    except Exception as e:
+        print(f"Exception while grading: {str(e)}")
 
 def main():
     """Main function to handle file upload and grading"""
@@ -108,8 +126,13 @@ def main():
     else:
         file_path = input("\nEnter the path to the Excel file to upload: ")
     
-    # Copy the file to uploads
-    uploaded_file = copy_file_to_uploads(file_path)
+    # Check if the file is already in the uploads folder
+    if os.path.dirname(os.path.abspath(file_path)) == os.path.abspath(UPLOAD_FOLDER):
+        print(f"File is already in uploads folder, using it directly")
+        uploaded_file = file_path
+    else:
+        # Copy the file to uploads
+        uploaded_file = copy_file_to_uploads(file_path)
     
     if uploaded_file:
         # Grade the uploaded file

@@ -1,211 +1,142 @@
 #!/usr/bin/python3
+"""
+Upload tool for Excel files that automatically grades them against a solution
+with simplified feedback that doesn't reveal correct answers.
+
+Usage:
+  python upload_and_grade_simplified.py [filename]
+  
+If no filename is provided, the script will prompt for one.
+"""
 
 import os
 import sys
-import json
-import openpyxl
+import shutil
+import datetime
 from pathlib import Path
 
+# Import the grading function from the autograder
+from excel_autograder_simplified import grade_excel_worksheet, generate_simplified_feedback
+
 # Constants
-SUBMISSION_LOCATION = "/shared/submission"  # Coursera autograder path
-STUDENT_SHEET_NAME = "blank"
-SOLUTION_SHEET_NAME = "solution"
-PART_ID = "Lg9eS"  # Update this with the correct part ID
+UPLOAD_FOLDER = "uploads"
+SOLUTION_FILE = "solution.xlsx"
 
-def print_stderr(error_msg):
-    """Print error message to stderr"""
-    print(str(error_msg), file=sys.stderr)
+def ensure_upload_folder():
+    """Create the uploads folder if it doesn't exist"""
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    print(f"✓ Upload folder ready: {UPLOAD_FOLDER}")
 
-def send_feedback(score, msg):
-    """Send feedback to Coursera autograder"""
-    post = {'fractionalScore': score, 'feedback': msg}
-    print(json.dumps(post))
+def generate_unique_filename(original_filename):
+    """Generate a unique filename with timestamp to avoid overwrites"""
+    # Get current timestamp
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # Write feedback to file for Coursera
+    # Extract base name and extension
+    base_name = Path(original_filename).stem
+    extension = Path(original_filename).suffix
+    
+    # Create new filename with timestamp
+    return f"{base_name}_{timestamp}{extension}"
+
+def copy_file_to_uploads(source_path):
+    """Copy the file to the uploads folder with a unique name"""
+    if not os.path.exists(source_path):
+        print(f"✗ Error: File not found: {source_path}")
+        return None
+    
+    # Verify it's an Excel file
+    extension = Path(source_path).suffix.lower()
+    if extension not in ['.xlsx', '.xlsm', '.xltx', '.xltm']:
+        print(f"✗ Error: File must be an Excel file (.xlsx, .xlsm, etc.): {source_path}")
+        return None
+    
+    # Check if the file is already in the uploads folder
+    if os.path.dirname(os.path.abspath(source_path)) == os.path.abspath(UPLOAD_FOLDER):
+        print(f"✓ File is already in uploads folder: {source_path}")
+        return source_path
+    
+    # Generate a unique filename
+    dest_filename = generate_unique_filename(os.path.basename(source_path))
+    dest_path = os.path.join(UPLOAD_FOLDER, dest_filename)
+    
+    # Copy the file
     try:
-        with open("/shared/feedback.json", "w") as outfile:
-            json.dump(post, outfile)
+        shutil.copyfile(source_path, dest_path)
+        print(f"✓ File uploaded to: {dest_path}")
+        return dest_path
     except Exception as e:
-        print_stderr(f"Error writing feedback: {e}")
+        print(f"✗ Error copying file: {e}")
+        return None
 
-def grade_excel_worksheet(student_file_path, solution_file_path):
-    """
-    Grade Excel worksheet by comparing Y/N values in row 1
+def grade_uploaded_file(file_path):
+    """Grade the uploaded file against the solution with simplified feedback"""
+    if not os.path.exists(SOLUTION_FILE):
+        print(f"✗ Error: Solution file not found: {SOLUTION_FILE}")
+        print("Please run extract_solution.py to create it first.")
+        return
     
-    Args:
-        student_file_path: Path to the student's Excel file
-        solution_file_path: Path to the solution Excel file
-        
-    Returns:
-        Dictionary with score and feedback
-    """
+    print(f"\n===== GRADING: {os.path.basename(file_path)} =====")
+    print(f"Comparing against solution: {SOLUTION_FILE}")
+    
+    # Verify the file exists
+    if not os.path.exists(file_path):
+        print(f"✗ Error: File does not exist at path: {file_path}")
+        return
+    
+    # Grade the submission
     try:
-        # Load workbooks
-        student_wb = openpyxl.load_workbook(student_file_path, data_only=True)
-        solution_wb = openpyxl.load_workbook(solution_file_path, data_only=True)
+        result = grade_excel_worksheet(file_path, SOLUTION_FILE)
         
-        # Verify sheets exist
-        if STUDENT_SHEET_NAME not in student_wb.sheetnames:
-            return {
-                "score": 0.0,
-                "feedback": f"Error: Worksheet '{STUDENT_SHEET_NAME}' not found in your submission."
-            }
-        
-        if SOLUTION_SHEET_NAME not in solution_wb.sheetnames:
-            return {
-                "score": 0.0,
-                "feedback": f"Error: Internal error - Solution worksheet not found."
-            }
-        
-        student_sheet = student_wb[STUDENT_SHEET_NAME]
-        solution_sheet = solution_wb[SOLUTION_SHEET_NAME]
-        
-        # Get Y/N values from row 1 in both sheets
-        student_values = []
-        solution_values = []
-        
-        # Get max column to analyze
-        max_col = max(solution_sheet.max_column, student_sheet.max_column)
-        
-        # Start from column E (index 5 in openpyxl)
-        for col_idx in range(5, max_col + 1):
-            student_cell = student_sheet.cell(row=1, column=col_idx)
-            solution_cell = solution_sheet.cell(row=1, column=col_idx)
+        # Display results
+        if 'score' in result:
+            percentage = result['score'] * 100
+            print(f"\nSCORE: {percentage:.2f}%")
             
-            # Add to values list if not None
-            if student_cell.value is not None and solution_cell.value is not None:
-                student_values.append({
-                    "col": openpyxl.utils.get_column_letter(col_idx),
-                    "value": student_cell.value
-                })
-                solution_values.append({
-                    "col": openpyxl.utils.get_column_letter(col_idx),
-                    "value": solution_cell.value
-                })
-        
-        # Calculate matches
-        matches = 0
-        total_cells = len(student_values)
-        correct_cells = []
-        incorrect_cells = []
-        
-        for i in range(total_cells):
-            student_val = student_values[i]
-            solution_val = solution_values[i]
+            # Create a feedback file
+            feedback_path = file_path.replace('.xlsx', '_feedback.txt').replace('.xlsm', '_feedback.txt')
+            with open(feedback_path, 'w') as f:
+                f.write(result['feedback'])
             
-            if student_val["value"] == solution_val["value"]:
-                matches += 1
-                correct_cells.append(student_val["col"] + "1")
-            else:
-                incorrect_cells.append({
-                    "cell": student_val["col"] + "1",
-                    "student": student_val["value"],
-                    "solution": solution_val["value"]
-                })
-        
-        # Calculate score (as a decimal between 0.0 and 1.0)
-        score = matches / total_cells if total_cells > 0 else 0.0
-        
-        # Generate feedback
-        feedback = generate_feedback(matches, total_cells, correct_cells, incorrect_cells)
-        
-        return {
-            "score": score,
-            "feedback": feedback
-        }
-        
+            print(f"Detailed feedback saved to: {feedback_path}")
+            
+            # Print the feedback to the console
+            print("\n" + "=" * 50)
+            print(result['feedback'])
+            print("=" * 50)
+        else:
+            print(f"Error grading file: {result.get('error', 'Unknown error')}")
     except Exception as e:
-        return {
-            "score": 0.0,
-            "feedback": f"Error grading your submission: {str(e)}"
-        }
-
-def generate_feedback(matches, total_cells, correct_cells, incorrect_cells):
-    """Generate feedback text based on grading results"""
-    # Calculate percentage score
-    percentage = (matches / total_cells) * 100 if total_cells > 0 else 0
-    
-    # Start with overall summary
-    feedback = [
-        f"Your score: {percentage:.2f}%",
-        f"You correctly matched {matches} out of {total_cells} Y/N values.",
-        ""
-    ]
-    
-    # Add details about correct and incorrect cells
-    if correct_cells:
-        feedback.append("Correct cells:")
-        # Group consecutive cells for readability
-        feedback.append(", ".join(correct_cells))
-        feedback.append("")
-    
-    if incorrect_cells:
-        feedback.append("Incorrect cells:")
-        for cell in incorrect_cells:
-            feedback.append(f"{cell['cell']}: Your answer was '{cell['student']}', but should be '{cell['solution']}'")
-        feedback.append("")
-        feedback.append("Please update your worksheet and try again.")
-    else:
-        feedback.append("Great job! All values are correct.")
-    
-    return "\n".join(feedback)
+        print(f"Exception while grading: {str(e)}")
 
 def main():
-    """Main function for the autograder"""
-    try:
-        # Get partId from environment (Coursera sets this)
-        try:
-            part_id = os.environ['partId']
-        except KeyError:
-            print_stderr("Please provide the partId.")
-            send_feedback(0.0, "Please provide the partId.")
-            return
+    """Main function to handle file upload and grading"""
+    print("\n===== EXCEL WORKSHEET UPLOADER & GRADER (SIMPLIFIED FEEDBACK) =====")
+    
+    # Ensure upload folder exists
+    ensure_upload_folder()
+    
+    # Get the file path from command-line args or prompt
+    if len(sys.argv) > 1:
+        file_path = sys.argv[1]
+    else:
+        file_path = input("\nEnter the path to the Excel file to upload: ")
+    
+    # Check if the file is already in the uploads folder
+    if os.path.dirname(os.path.abspath(file_path)) == os.path.abspath(UPLOAD_FOLDER):
+        print(f"File is already in uploads folder, using it directly")
+        uploaded_file = file_path
+    else:
+        # Copy the file to uploads
+        uploaded_file = copy_file_to_uploads(file_path)
+    
+    if uploaded_file:
+        # Grade the uploaded file
+        grade_uploaded_file(uploaded_file)
         
-        # Verify correct partId
-        if part_id != PART_ID:
-            print_stderr("Cannot find matching partId. Please double check your partId's")
-            send_feedback(0.0, "Please verify that you have submitted to the proper part of the assignment.")
-            return
-        
-        # Find the Excel file in the submission directory
-        student_file = None
-        solution_file = None
-        
-        # Local testing mode
-        if len(sys.argv) > 2 and os.path.exists(sys.argv[1]) and os.path.exists(sys.argv[2]):
-            student_file = sys.argv[1]
-            solution_file = sys.argv[2]
-        else:
-            # Coursera mode
-            # Find student submission
-            for f in os.listdir(SUBMISSION_LOCATION):
-                extension = Path(f).suffix.lower()
-                if extension in ['.xlsx', '.xlsm', '.xltx', '.xltm']:
-                    student_file = os.path.join(SUBMISSION_LOCATION, f)
-                    break
-            
-            # Get solution file path
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            solution_file = os.path.join(script_dir, "solution.xlsx")
-        
-        # Check if files exist
-        if student_file is None:
-            send_feedback(0.0, "No Excel file found in your submission. Please submit an Excel file (.xlsx, .xlsm).")
-            return
-        
-        if not os.path.exists(solution_file):
-            send_feedback(0.0, "Internal error: Solution file not found.")
-            return
-        
-        # Grade the submission
-        result = grade_excel_worksheet(student_file, solution_file)
-        
-        # Send feedback to Coursera
-        send_feedback(result["score"], result["feedback"])
-        
-    except Exception as e:
-        print_stderr(f"Error in autograder: {e}")
-        send_feedback(0.0, f"An error occurred while grading your submission: {str(e)}")
+        print("\n✓ Process completed successfully!")
+    else:
+        print("\n✗ Upload failed. Please check the file and try again.")
 
 if __name__ == "__main__":
     main()
