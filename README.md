@@ -1,131 +1,75 @@
-# Excel Worksheet Uploader & Grader - Usage Guide
+# Excel Worksheet Grader
 
-This guide explains how to use the Excel uploader and grader tools included in this package. These tools allow you to upload Excel files, store them in a designated folder, and automatically grade them against a solution file.
+A simple tool for grading Excel worksheets that compares Y/N values in row 1.
 
-## Available Tools
+## Files
 
-This package includes three different ways to upload and grade Excel files:
+- `autograder.py` - Core grading functionality
+- `uploader.py` - Upload and grade individual files
+- `batch.py` - Grade multiple files at once
+- `solution.xlsx` - Reference solution file
+- `Dockerfile` - For Coursera integration
 
-1. **Command-line Uploader** (`upload_and_grade.py`) - Simple command-line tool for uploading and grading individual files
-2. **Batch Grader** (`batch_grade.py`) - Process multiple Excel files at once
-3. **GUI Uploader** (`gui_upload_grade.py`) - Graphical interface for file selection and grading
+## Usage
 
-## Prerequisites
+### Individual Grading
 
-Before using any of these tools, you need to:
-
-1. Make sure you have Python 3.7+ installed
-2. Install required packages:
-   ```bash
-   pip install openpyxl pandas
-   ```
-3. Create the solution file by running:
-   ```bash
-   python extract_solution.py Finalreal.xlsx
-   ```
-
-## 1. Command-line Uploader
-
-The command-line uploader allows you to upload and grade a single Excel file.
-
-### Usage
+Grade a single Excel file:
 
 ```bash
-python upload_and_grade.py [file_path]
-```
-
-If you don't provide a file path, the script will prompt you to enter one.
-
-### Example
-
-```bash
-python upload_and_grade.py student_submission.xlsx
+python uploader.py student_file.xlsx
 ```
 
 This will:
-1. Copy the file to the `uploads` folder with a timestamp in the filename
-2. Grade it against `solution.xlsx`
-3. Display the score and feedback
-4. Save the feedback to a text file in the `uploads` folder
+- Copy the file to the `uploads` folder
+- Grade it against `solution.xlsx`
+- Display the score and feedback
+- Save feedback to a text file
 
-## 2. Batch Grader
+### Batch Grading
 
-The batch grader allows you to process multiple Excel files at once.
-
-### Usage
+Grade multiple Excel files:
 
 ```bash
-python batch_grade.py [folder_or_files]
-```
+# Grade all Excel files in a directory
+python batch.py submissions/
 
-You can specify:
-- A folder containing Excel files
-- Multiple Excel files separated by spaces
-- No arguments (to process all Excel files in the current directory)
+# Grade specific files
+python batch.py file1.xlsx file2.xlsx
 
-### Examples
-
-Process all Excel files in a specific folder:
-```bash
-python batch_grade.py student_submissions/
-```
-
-Process specific files:
-```bash
-python batch_grade.py file1.xlsx file2.xlsx file3.xlsx
-```
-
-Process all Excel files in the current directory:
-```bash
-python batch_grade.py
+# Grade all Excel files in current directory
+python batch.py
 ```
 
 This will:
-1. Grade each file against `solution.xlsx`
-2. Create individual feedback files in the `results` folder
-3. Generate a summary report in CSV and Excel formats
-4. Display a summary table in the console
+- Grade all the specified Excel files
+- Save feedback files in the `results` folder
+- Generate summary reports in CSV and Excel formats
+- Display statistics and a summary table
 
-## 3. GUI Uploader
+### Feedback Format
 
-The GUI uploader provides a graphical interface for selecting, uploading, and grading Excel files.
+The grader provides minimal feedback:
 
-### Usage
-
-```bash
-python gui_upload_grade.py
+```
+Your score: 85.33%
+You correctly matched 64 out of 75 cells.
 ```
 
-This will open a window where you can:
-1. Click "Select Excel Files" to choose files from your computer
-2. Click "Upload and Grade Files" to process them
-3. View results in the text area
-4. Save detailed feedback to text files
-5. Open the uploads folder to access the processed files
+## Coursera Integration
 
-## File Locations
+To use this with Coursera:
 
-- Uploaded files are stored in the `uploads` folder
-- Batch processing results are stored in the `results` folder
-- Feedback files are saved next to the uploaded files with `_feedback.txt` suffix
+1. Update the `PART_ID` in `autograder.py`
+2. Build the Docker image:
+   ```
+   docker build -t excel-grader .
+   ```
+3. Test locally with Coursera autograder tool
+4. Upload to Coursera
 
-## Troubleshooting
+## Requirements
 
-If you encounter issues:
-
-1. **Missing solution file**: Run `extract_solution.py` first
-2. **Import errors**: Make sure you've installed required packages
-3. **Permission errors**: Check that you have write permissions for the uploads and results folders
-4. **Excel format issues**: Ensure the worksheet names match those expected by the autograder
-
-## Customizing the Grader
-
-If you need to adjust how the grading works:
-
-1. The main grading logic is in `excel_autograder.py`
-2. To change the expected worksheet names, modify the `STUDENT_SHEET_NAME` and `SOLUTION_SHEET_NAME` constants
-3. To adjust the scoring or feedback, modify the `grade_excel_worksheet` and `generate_feedback` functions
-
----
-
-For additional help or to report issues, please contact your instructor or teaching assistant.
+- Python 3.6 or higher
+- openpyxl package (`pip install openpyxl`)
+- pandas package for batch grading (`pip install pandas`)
