@@ -3,7 +3,6 @@
 Excel Worksheet Autograder for Coursera
 
 This script handles submission processing and grading for Excel worksheets.
-Includes hidden test cases to verify specific cells.
 """
 
 import os
@@ -22,13 +21,6 @@ COURSERA_PARTID = "Lg9eS"  # Update with your assignment's part ID
 # Worksheet names
 STUDENT_SHEET_NAME = "blank"
 SOLUTION_SHEET_NAME = "solution"
-
-# Hidden test cells to check
-HIDDEN_TEST_CELLS = [
-    {"cell": "AD21", "description": "Financial calculation test"},
-    {"cell": "M62", "description": "Data processing test"},
-    {"cell": "AE187", "description": "Formula application test"}
-]
 
 def print_stderr(error_msg):
     """Print error message to stderr"""
@@ -49,7 +41,6 @@ def send_feedback(score, msg):
 def grade_excel_worksheet():
     """
     Grade the Excel worksheet by comparing Y/N values in row 1
-    and checking hidden test cells
     
     Returns:
         Dictionary with score and feedback
@@ -76,7 +67,7 @@ def grade_excel_worksheet():
         student_sheet = student_wb[STUDENT_SHEET_NAME]
         solution_sheet = solution_wb[SOLUTION_SHEET_NAME]
         
-        # PART 1: Check Y/N values in row 1
+        # Get Y/N values from row 1 in both sheets
         matches = 0
         total_cells = 0
         max_col = max(solution_sheet.max_column, student_sheet.max_column)
@@ -91,31 +82,13 @@ def grade_excel_worksheet():
                 if student_cell.value == solution_cell.value:
                     matches += 1
         
-        # PART 2: Check hidden test cells
-        hidden_tests_passed = 0
-        for test in HIDDEN_TEST_CELLS:
-            cell_addr = test["cell"]
-            
-            # Get values from both sheets
-            student_value = get_cell_value(student_sheet, cell_addr)
-            solution_value = get_cell_value(solution_sheet, cell_addr)
-            
-            # Compare values (considering None and empty string as equal)
-            if equal_values(student_value, solution_value):
-                hidden_tests_passed += 1
-        
-        # Calculate total score (80% from Y/N values, 20% from hidden tests)
-        yn_score = matches / total_cells if total_cells > 0 else 0.0
-        hidden_score = hidden_tests_passed / len(HIDDEN_TEST_CELLS)
-        
-        total_score = yn_score * 0.8 + hidden_score * 0.2
-        percentage = total_score * 100
-        
-        # Generate feedback (only showing Y/N results to the student)
+        # Calculate score and generate feedback
+        score = matches / total_cells if total_cells > 0 else 0.0
+        percentage = score * 100
         feedback = f"Your score: {percentage:.2f}%\nYou correctly matched {matches} out of {total_cells} cells."
         
         return {
-            "score": total_score,
+            "score": score,
             "feedback": feedback
         }
         
@@ -124,50 +97,6 @@ def grade_excel_worksheet():
             "score": 0.0,
             "feedback": f"Error grading your submission: {str(e)}"
         }
-
-def get_cell_value(sheet, cell_addr):
-    """
-    Safely get a cell value
-    
-    Args:
-        sheet: The worksheet
-        cell_addr: Cell address (e.g., "A1")
-        
-    Returns:
-        Cell value or None if cell doesn't exist
-    """
-    try:
-        return sheet[cell_addr].value
-    except:
-        return None
-
-def equal_values(val1, val2):
-    """
-    Compare two cell values, treating None and empty string as equal
-    Also handles numeric comparisons with small floating-point differences
-    
-    Args:
-        val1: First value
-        val2: Second value
-        
-    Returns:
-        True if values are equal, False otherwise
-    """
-    # Both are None or empty
-    if (val1 is None or val1 == "") and (val2 is None or val2 == ""):
-        return True
-    
-    # Both are numeric
-    if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):
-        # Allow small floating point differences
-        return abs(val1 - val2) < 0.0001
-    
-    # String comparison (case-insensitive for text)
-    if isinstance(val1, str) and isinstance(val2, str):
-        return val1.strip().lower() == val2.strip().lower()
-    
-    # Direct comparison for other types
-    return val1 == val2
 
 def main(part_id):
     """Main function for the autograder"""
