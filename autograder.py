@@ -16,7 +16,7 @@ from pathlib import Path
 SUBMISSION_LOCATION = "/shared/submission"
 SUBMISSION_DESTINATION = "/grader/submission.xlsx"
 REFERENCE_SOLUTION = "/grader/solution.xlsx"
-COURSERA_PARTID = "Lg9eS"  # Update with your assignment's part ID
+COURSERA_PARTID = "tW9y1"  # Update with your assignment's part ID
 
 # Worksheet names
 STUDENT_SHEET_NAME = "blank"
