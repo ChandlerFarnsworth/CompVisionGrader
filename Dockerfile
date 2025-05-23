@@ -32,4 +32,4 @@ ENV SUBMISSION_DIR=/shared/submission
 RUN chmod +x grader.py
 
 # Default command
-CMD ["python3", "grader.py"]
+CMD ["python3", "autograder.py"]
