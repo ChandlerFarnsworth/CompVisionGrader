@@ -1,28 +1,35 @@
-# Base image
-FROM ubuntu:22.04
+# Use Python 3.9 base image
+FROM python:3.9-slim
 
-# Set non-interactive mode for apt
-ENV DEBIAN_FRONTEND=noninteractive
+# Set working directory
+WORKDIR /grader
 
-# Install Python and dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
-    python3-distutils \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install openpyxl
-RUN pip install openpyxl
+# Copy requirements file
+COPY requirements.txt .
 
-# Create grader directory
-RUN mkdir /grader
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy autograder and solution
-COPY autograder.py /grader/autograder.py
-COPY solution.xlsx /grader/solution.xlsx
+# Copy grader files
+COPY . .
 
-# Set permissions
-RUN chmod a+x /grader/autograder.py
+# Create necessary directories
+RUN mkdir -p /shared/submission
+RUN mkdir -p /grader/solutions
+RUN mkdir -p /grader/output
 
-# Set entrypoint
-ENTRYPOINT ["/grader/autograder.py"]
+# Set environment variables
+ENV PYTHONPATH=/grader
+ENV SUBMISSION_DIR=/shared/submission
+
+# Make the grader script executable
+RUN chmod +x grader.py
+
+# Default command
+CMD ["python3", "grader.py"]
