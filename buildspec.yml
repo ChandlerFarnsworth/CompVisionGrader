@@ -1,0 +1,19 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+  pre_build:
+    commands:
+      - echo "Installing Python dependencies..."
+      - pip install pandas numpy openpyxl chardet
+      - ls -la
+      - echo "Files in current directory:"
+      - pwd
+  build:
+    commands:
+      - echo "Running autograder..."
+      - python3 autograder.py
+  post_build:
+    commands:
+      - echo "Build completed"

@@ -33,6 +33,7 @@ def send_feedback(score, msg):
     
     # Write feedback to file for Coursera
     try:
+        os.makedirs("/shared", exist_ok=True)
         with open("/shared/feedback.json", "w") as outfile:
             json.dump(post, outfile)
     except Exception as e:

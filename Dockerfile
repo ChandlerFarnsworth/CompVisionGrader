@@ -1,30 +1,38 @@
-FROM python:3.9-slim
+# Use Ubuntu 22.04 as base (more compatible with Coursera)
+FROM ubuntu:22.04
 
-# Debug: List all files in the current directory
-RUN echo "=== DEBUGGING: Files in build context ===" && ls -la
+# Set non-interactive mode for apt
+ENV DEBIAN_FRONTEND=noninteractive
 
-WORKDIR /grader
-
-# Debug: List files after setting workdir
-RUN echo "=== DEBUGGING: Files in /grader ===" && ls -la
-
+# Install Python 3.10, pip, and other essentials
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+    python3.10 \
+    python3-pip \
+    python3.10-venv \
+    python3-distutils \
+    curl \
+    ca-certificates \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Symlink python3.10 to python
+RUN ln -s /usr/bin/python3.10 /usr/bin/python
 
-COPY . .
+# Install required Python packages
+RUN python3.10 -m pip install --no-cache-dir pandas numpy openpyxl chardet
 
-RUN mkdir -p /shared/submission
-RUN mkdir -p /grader/solutions
-RUN mkdir -p /grader/output
+# Create grader directory
+RUN mkdir /grader
 
-ENV PYTHONPATH=/grader
-ENV SUBMISSION_DIR=/shared/submission
+# Copy files individually (more reliable for Coursera)
+COPY autograder.py /grader/autograder.py
+COPY grader.py /grader/grader.py
+COPY solution.xlsx /grader/solution.xlsx
 
-RUN chmod +x grader.py
+# Set proper permissions
+RUN chmod a+rwx -R /grader/
 
-CMD ["python3", "autograder.py"]
+# Make the autograder executable
+RUN chmod +x /grader/autograder.py
+
+# Set the entrypoint
+ENTRYPOINT ["python3", "/grader/autograder.py"]
